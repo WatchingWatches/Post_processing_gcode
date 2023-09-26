@@ -5,6 +5,7 @@ If the fan speed is set to 0 the program won't change that, since it's intended 
 
 I would recommend to test the program first to see that everything is working.
 To do so save a presliced file and set "run_in_slicer = False". Then insert the path in line 55..., run the program and compare both files
+Use on your own risk!
 """
 #!/usr/bin/python
 import re
