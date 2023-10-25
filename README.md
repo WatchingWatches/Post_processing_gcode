@@ -6,3 +6,6 @@ If the slicer can't execute python you'll get the error: Win32 error 193
 For debugging run the script in an IDE with a presliced gcode.
 Use on your own risk!
 ![image](https://github.com/WatchingWatches/Post_processing_gcode/assets/106354710/d433713b-6e07-48ab-8253-5edffec04f27)
+
+Example of how the script limit_retractions.py manipulates the retractions of the gcode file:
+![Uploading Collage_before_after.png…]()
