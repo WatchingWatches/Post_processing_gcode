@@ -7,13 +7,22 @@ Created on Sat Aug 26 12:25:10 2023
 Post processing script to limit maximum amount of retractions,
 to prevent ground down filament from the extruder
 If you are interested in how the program works read the explenation of the main loop
-in line 246... 
+in line 269... 
 """
 
 """        ***Limitations***
 -no support for G2/G3 commands yet only G1
 -only relative extrusion mode supported!!
     (in prusaslicer go to printer settings and activate "Use relative E distance" You must be in expert mode)
+
+"""
+
+"""        ***Important info***
+when you use filament override for retraction distance add this to your prusa slicer end gcode
+in printer settings under custom G-code (filament override needs to be enabled otherwise prusa slicer gives an error):
+; stop searching
+
+{if filament_retract_length[0] == retract_length[0]}; override_retract_length = {filament_retract_length[0]} {endif}
 
 """
 
@@ -24,10 +33,12 @@ When you want a correct preview open the saved gcode in an gcode viewer
 When you run the script for the first few time check that everything is working as it should
  
 The larger the file the longer the processing time
+Everything is configured to be called within the prusa slicer
 
 if you have questions write on reddit to me u/Watching-Watches
 Use at your own risk!
 """
+
 
 import re
 import sys
@@ -72,7 +83,6 @@ l_retr = 0
 n_corrections = 0
 
 Ex_list = [] #list of lines with extrusions
-REMOVE_list = [] # list of lines where the retraction needs to be removed
 
 
 #passed tests
@@ -114,11 +124,8 @@ def extrusion(i): #reads E value
     
     ex = float(ex)
     
-    if (debugging_extrusion == True):
-        k_n +=1 #counts extrusions
-        print(ex,'line:',i+1) # for debugging purpose print extrusion value and the line 
-           
     return ex
+
 
 
 """How  del_retr works:
@@ -140,15 +147,17 @@ deleting:
 
 
 #passed tests
-def del_retr(REMOVE_list, n_remove): #deletes retractions inside of list n_remove times
+def del_retr(i_0, i_1, n_remove): #deletes retractions inside of list n_remove times
+    # i_0: start of the searched list
+    # i_1: end of the searched list
     corrections = 0 #how often the retraction was removed within the function
     l_retr = 0
     start_search_ex = 0
 
     del_list = [] #list of lines with retractions, which will be empty at the begginning 
     
-    for z in range(len(REMOVE_list)-1,0,-1):
-        search = REMOVE_list[z] #contains lines which will lose retractions
+    for z in range(i_1,i_0,-1):
+        search = Ex_list[z] #contains lines which will lose retractions
         ex_z = extrusion(search)
         if(ex_z < 0): #retraction found
             if(l_retr == 0):
@@ -164,8 +173,8 @@ def del_retr(REMOVE_list, n_remove): #deletes retractions inside of list n_remov
                 l_ex = 0
             
                 #remove extrusion compensation
-                for j in range(start_search_ex,len(REMOVE_list),1):
-                    search_ex = REMOVE_list[j]
+                for j in range(start_search_ex, i_1, 1):
+                    search_ex = Ex_list[j]
                     if(extrusion(search_ex) > 0):
                         l_ex += extrusion(search_ex)
                         
@@ -219,7 +228,8 @@ else:#if not running in slicer
 
 with open(path_input, "r") as input_file:
     lines = input_file.readlines() #saves the gcode as an list
-    
+
+found_retr_d = False    
 #searches in gcode for retraction distance value    
 if(serach_for_retr_d):
     for find_retr_d_value in range(len(lines)-1, 0, -1):
@@ -232,16 +242,29 @@ if(serach_for_retr_d):
             
             retr_d = line[line_start:line_end]
             retr_d = float(retr_d)
+            found_retr_d = True
+
+          
+        if(re.search(r'^; override_retract_length =', line)):
             
-            break #once it's found the value, the search ends
+            line_end = len(line) - 1
+        
+            line_start = line.find('=') + 1
             
-        if(find_retr_d_value == 1): #value not found in script
-            print('no retraction distance value found!')
-            print('Enter retraction distance manually and press enter use "." as decimal point', '\n')
-            print('check your output options in the slicer settings')
+            retr_d = line[line_start:line_end]
+            retr_d = float(retr_d)
             
-            retr_d = input()
+            found_retr_d = True
             
+        
+        if(re.search(r'^; stop searching', line)): # stops earching in gcode here to improve speed
+            if(not found_retr_d): #value not found in script
+                print('no retraction distance value found!')
+                print('Enter retraction distance manually and press enter use "." as decimal point', '\n')
+                print('check your output options in the slicer settings')
+                
+                retr_d = input()
+            break # stop searching the gcode
 
 """How the main loop works:
     
@@ -261,6 +284,7 @@ Before deleting retractions the list must end with a full retraction or must inc
 error_n = 0
 ges_retr = 0
 ges_retr_remove = 0
+i_0 = 0
 
 if (run_mainloop):
     for l in range(0, len(lines)-1, 1):#get the list with extrusion
@@ -270,7 +294,8 @@ if (run_mainloop):
         while(i < len(Ex_list)-1): #main loop 
             i += 1
             p = Ex_list[i] #only observes lines with relevant E's 
-            REMOVE_list.append(p) #writes list in which gcode lines the algorythem is searching
+            #REMOVE_list.append(p) #writes list in which gcode lines the algorythem is searching
+            i_1 = i
             ex_p = extrusion(p)
             
             l_ex += ex_p #sum of extrusion
@@ -297,10 +322,12 @@ if (run_mainloop):
                             ex_p0 = extrusion(p)
                             
                             if(ex_p0 < 0):
-                                REMOVE_list.append(p)
+                                #REMOVE_list.append(p)
+                                i_1 = i
                                 
                             else:
-                                REMOVE_list.append(p)
+                                #REMOVE_list.append(p)
+                                i_1 = i
                                 
                                 compensation += ex_p0
                                 
@@ -310,8 +337,8 @@ if (run_mainloop):
                     #check if the extrusion of the last elements is bigger/equal than retrction distance                
                     if(ex_p >= 0):
                         compensation_back = 0
-                        for back in range(len(REMOVE_list)-1,0,-1):
-                            p = REMOVE_list[back]
+                        for back in range(i_1-1,0,-1):
+                            p = Ex_list[back]
                             ex_p = extrusion(p)
                             
                             if(ex_p < 0): #retraction before break condition in list
@@ -319,10 +346,12 @@ if (run_mainloop):
                                     p = Ex_list[front]
                                     ex_p0 = extrusion(p)
                                     if(ex_p0 < 0):
-                                        REMOVE_list.append(p)
+                                        #REMOVE_list.append(p)
+                                        i_1 = i
                                         
                                     else:
-                                        REMOVE_list.append(p)
+                                        #REMOVE_list.append(p)
+                                        i_1 = i
                                         compensation += ex_p0
                                         
                                         if(compensation >= retr_d):
@@ -335,18 +364,20 @@ if (run_mainloop):
                                     break
                             
                                
-                    ges_retr_remove += n_remove #counts all the deleted retractions   
-                    del_retr(REMOVE_list, n_remove) #run function which deletes retractions within the list
+                    ges_retr_remove += n_remove #counts all the deleted retractions
+                    
+                    del_retr(i_0, i_1, n_remove) #run function which deletes retractions within the list
                     
                     n_corrections += 1 #this shows in the end how many corrections the program made
                     
                     #reset all values
                     n_retract = 0
-                    #print('called')
+                    
                     l_ex = 0
                     l_retr = 0
                     
-                    REMOVE_list = [] #deleting the previous list
+                    #REMOVE_list = [] #deleting the previous list
+                    i_0 = i + 1
                     
                 else:    
                     #reset all values
@@ -355,7 +386,8 @@ if (run_mainloop):
                     l_ex = 0
                     l_retr = 0
                     
-                    REMOVE_list = [] #deleting the previous list
+                    #REMOVE_list = [] #deleting the previous list
+                    i_0 = i + 1
             
         
         
@@ -414,9 +446,7 @@ if(control_stats  and run_mainloop):
     total_time = end_time - start_time
     print('Run time: ', total_time, '[s]', '\n')
     
-    if(pause_for_info and run_in_slicer):
-        print('Press Enter to close')
-        input()
+    
     
     
 if(Output == True):
@@ -426,3 +456,7 @@ if(Output == True):
             output.write("%s"  % lines[t])           
     output.close()
 input_file.close()  
+
+if(pause_for_info and run_in_slicer and control_stats and run_mainloop):
+    print('Press Enter to close')
+    input()
