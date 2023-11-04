@@ -7,5 +7,6 @@ For debugging run the script in an IDE with a presliced gcode.
 Use on your own risk!
 ![image](https://github.com/WatchingWatches/Post_processing_gcode/assets/106354710/d433713b-6e07-48ab-8253-5edffec04f27)
 
-Example of how the script limit_retractions.py manipulates the retractions of the gcode file:
-![Uploading Collage_before_after.png…]()
+Example of how the script limit_retractions.py manipulates the retractions of the gcode file
+
+![Collage_before_after](https://github.com/WatchingWatches/Post_processing_gcode/assets/106354710/bc6427a8-e1f5-40dd-9481-be738bed33a3)
