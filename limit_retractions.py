@@ -7,11 +7,10 @@ Created on Sat Aug 26 12:25:10 2023
 Post processing script to limit maximum amount of retractions,
 to prevent ground down filament from the extruder
 If you are interested in how the program works read the explenation of the main loop
-in line 269... 
+in line 348... 
 """
 
 """        ***Limitations***
--no support for G2/G3 commands yet only G1
 -only relative extrusion mode supported!!
     (in prusaslicer go to printer settings and activate "Use relative E distance" You must be in expert mode)
 
@@ -19,11 +18,20 @@ in line 269...
 
 """        ***Important info***
 when you use filament override for retraction distance add this to your prusa slicer end gcode
-in printer settings under custom G-code (filament override needs to be enabled otherwise prusa slicer gives an error):
+in printer settings under custom G-code (filament override needs to be enabled for every filament you use otherwise prusa slicer gives an error):
 ; stop searching
 
 {if filament_retract_length[0] == retract_length[0]}; override_retract_length = {filament_retract_length[0]} {endif}
 
+
+How to override n_retract_max for different filaments:
+    insert this in filament settings in custom gcode to end G-code:
+; stop searching
+; n_retract_max_override = 12
+
+when you use this option you MUST remove "; stop searching"  in printer settings
+and write ;stop searching to every filament settings you use
+check your control stats to see if it worked
 """
 
 """        ***PLEASE NOTE:***
@@ -39,6 +47,13 @@ if you have questions write on reddit to me u/Watching-Watches
 Use at your own risk!
 """
 
+""" Latest Update 30.11.23:
+    - G2/G3 moves are now recognized by the program
+    - possebility to override  n_retract_max (serach_for_retr_d must be True)
+    - added possebility to override retraction distance with filament override
+    (serach_for_retr_d must be True)
+
+"""
 
 import re
 import sys
@@ -53,6 +68,7 @@ debugging_extrusion = False
 debugging_run = False
 debugging_remove_E = False
 debugging_del_retr = False
+debugging_find_E = False
 
 #operating options
 #set all three to True if you want to run it in slicer
@@ -69,7 +85,7 @@ pause_for_info = True #pauses at the end of the script to show control stats
 #important parameters
 #retr_d will be overwritten when "serach_for_retr_d = True"
 retr_d = 4.5 #retraction distance must be positive!!
-n_retract_max = 10 #maximum retracts in interval
+n_retract_max = 22 #maximum retracts in interval
 k = 1 #factor for distance / interval in which the retractions are looked at
 
 
@@ -83,30 +99,48 @@ l_retr = 0
 n_corrections = 0
 
 Ex_list = [] #list of lines with extrusions
+#REMOVE_list = [] # list of lines where the retraction needs to be removed
 
 
 #passed tests
 def find_E(i):#writes list with lines, which contain G1 moves with E 
+    """
+    Args: number of line in gcode (int)
+    When the line in gcode is a extrusion it appends the line to a list
+    
+    return: None
+    
+    the function appends the number of line to a list if an extrusion is found
+    """
+
     line = lines[i]
     
-    if(re.search('^G1\s+[X+Y+F+E]', line)):
-        if(re.search('[E]', line)):#searches for E in G1 move
-            if not(re.search('[F]', line) and re.search('[X|Y]', line)):# both are in line do nothing
-                if not(re.search('[;]', line)): #prevents findig the E in the comments like ;WIPE
-                    Ex_list.append(i)
-                    
-                else:
-                    #in case line has a comment
-                    E = line.find('E') #finds the first E in line 
-                    comment = line.find(';')
-                    
-                    #when the E is in front of the ; it's an extrusion
-                    if(E < comment):
-                        Ex_list.append(i)
+    if(re.search(r'^G[1-3].*E', line)):
+
+        if not(re.search('[;]', line)): #prevents finding the E in the comments like ;WIPE
+            Ex_list.append(i)
+            
+        else:
+            #in case line has a comment
+            E = line.find('E') #finds the first E in line 
+            comment = line.find(';')
+            
+            #when the E is in front of the ; it's an extrusion
+            if(E < comment):
+                Ex_list.append(i)
+    
             
 #passed tests
 def extrusion(i): #reads E value
-    global k_n
+    """
+    Args:
+        line of gcode with extrusion (int)
+        
+    return:
+        E value of line (float)
+    
+    """
+    #global k_n
     line = lines[i]
     
     #find the position of extrusion value and save it as output
@@ -124,9 +158,30 @@ def extrusion(i): #reads E value
     
     ex = float(ex)
     
+    """
+    if (debugging_extrusion == True):
+        k_n +=1 #counts extrusions
+        print(ex,'line:',i+1) # for debugging purpose print extrusion value and the line 
+    """       
     return ex
 
-
+"""Vorgehen:
+wenn zu hohe Anzahl an retractions gefunden:
+    liste schreiben mit position von bereich
+    liste von hinten suchen und bestimmte Anzahl entfernen
+    
+entfernen:
+    negatives E finden und weitersuchen bis retraction distance gefunden
+        davon liste schreiben
+    danach vor ersten negativen E wert gehen und extrusion entfernen bis retraction_d getroffen
+        in liste hinzufügen
+    
+    alle einträge der liste mit remove_E entfernen
+        listen einträge löschen
+    
+    so oft wiederholen bis n_remove getroffen ist
+    
+"""
 
 """How  del_retr works:
 This fuction deletes retractions
@@ -145,23 +200,31 @@ deleting:
 
 """
 
-
 #passed tests
 def del_retr(i_0, i_1, n_remove): #deletes retractions inside of list n_remove times
-    # i_0: start of the searched list
-    # i_1: end of the searched list
+    """
+    Args:
+        i_0 (int): start of the searched list 
+        i_1 (int): end of the searched list 
+        i_0 to i_1 is the interval in which the function should delete reatractions
+        n_remove (int): how many retractions get deleted 
+        
+    return:
+        None
+    
+    """
     corrections = 0 #how often the retraction was removed within the function
     l_retr = 0
     start_search_ex = 0
 
-    del_list = [] #list of lines with retractions, which will be empty at the begginning 
+    del_list = [] # list of lines with retractions, which will be empty at the begginning 
     
     for z in range(i_1,i_0,-1):
-        search = Ex_list[z] #contains lines which will lose retractions
+        search = Ex_list[z] # contains lines which will lose retractions
         ex_z = extrusion(search)
-        if(ex_z < 0): #retraction found
+        if(ex_z < 0): # retraction found
             if(l_retr == 0):
-                start_search_ex = z  #start from here to search for extrusion in next loop
+                start_search_ex = z  # start from here to search for extrusion in next loop
                 
                 
             l_retr += ex_z
@@ -180,7 +243,6 @@ def del_retr(i_0, i_1, n_remove): #deletes retractions inside of list n_remove t
                         
                     if(l_ex <= retr_d): #add to list to remove retraction compensation
                         del_list.append(search_ex)
-                        #print('success')
                         
                         if(l_ex >= retr_d):#exits loop
                             break
@@ -199,38 +261,47 @@ def del_retr(i_0, i_1, n_remove): #deletes retractions inside of list n_remove t
    
         
 #passed tests
-def remove_E(i): 
+def remove_E(i):
+    """
+    Args:
+        i (int): line of gcode
+        
+    return:
+        None
+        
+    deletes the extrusion of a given line
+
+    """
     global lines,line
     line = lines[i]
-    if(re.search('[F]', line) or not re.search('[X|Y]', line)): #in case F is behind E
-        line = ';here was an retraction\n' #adds a comment in the gcode
+    if(re.search('[F]', line) or not re.search('[X|Y]', line)): # in case F is behind E
+        line = ';here was an retraction\n' # adds a comment in the gcode
            
     else:
         end = line.find('E')
-        start = 0
     
-        line = line[start:end]+'\n' #\n initiates newline
+        line = line[0:end]+'\n' #\n initiates newline
     
     lines[i] = line
     
     
 
 if (run_in_slicer == True):
-    path_input = sys.argv[1]
-    path_output = path_input #same input and output
+    path_input = sys.argv[1] # the path of the gcode given by the slicer
+    path_output = path_input # same input and output
     
-else:#if not running in slicer
-    #insert the path for the input and output file here
+else:# if not running in slicer
+    # insert the path for the input and output file here
     path_input = 'C:/Users/bjans/OneDrive/Dokumente/CAD/Software/post_processing_gcode/retraction_script_test_21m_0.20mm_210C_PLA_ENDER5PRO.gcode'
-    #you can name the output file however you want but don't forget to name it .gcode
-    #if input and output path are the same the old file will be overwritten
+    # you can name the output file however you want but don't forget to name it .gcode
+    # if input and output path are the same the old file will be overwritten
     path_output = 'C:/Users/bjans/OneDrive/Dokumente/CAD/Software/post_processing_gcode/retraction_script_test_result.gcode'
 
 with open(path_input, "r") as input_file:
-    lines = input_file.readlines() #saves the gcode as an list
+    lines = input_file.readlines() # saves the gcode as an list
 
 found_retr_d = False    
-#searches in gcode for retraction distance value    
+# searches in gcode for retraction distance value    
 if(serach_for_retr_d):
     for find_retr_d_value in range(len(lines)-1, 0, -1):
         line = lines[find_retr_d_value]
@@ -256,6 +327,14 @@ if(serach_for_retr_d):
             
             found_retr_d = True
             
+            
+        if(re.search(r'^; n_retract_max_override =', line)):
+            line_end = len(line) - 1
+        
+            line_start = line.find('=') + 1
+            
+            n_retract_max = line[line_start:line_end]
+            n_retract_max = int(n_retract_max)
         
         if(re.search(r'^; stop searching', line)): # stops earching in gcode here to improve speed
             if(not found_retr_d): #value not found in script
@@ -287,35 +366,35 @@ ges_retr_remove = 0
 i_0 = 0
 
 if (run_mainloop):
-    for l in range(0, len(lines)-1, 1):#get the list with extrusion
+    for l in range(0, len(lines)-1, 1):# get the list with extrusion
         find_E(l)
     i = 0
     try:
         while(i < len(Ex_list)-1): #main loop 
             i += 1
-            p = Ex_list[i] #only observes lines with relevant E's 
+            p = Ex_list[i] # only observes lines with relevant E's 
             #REMOVE_list.append(p) #writes list in which gcode lines the algorythem is searching
             i_1 = i
             ex_p = extrusion(p)
             
-            l_ex += ex_p #sum of extrusion
+            l_ex += ex_p # sum of extrusion
             
-            if(ex_p < 0): #negative values = retraction
-                l_retr += ex_p #sum of retraction (negative value)
+            if(ex_p < 0): # negative values = retraction
+                l_retr += ex_p # sum of retraction (negative value)
             
                 if(l_retr <= -1*retr_d):
-                    n_retract += 1 #retraction count
+                    n_retract += 1 # retraction count
                     ges_retr += 1
                     
-                    l_retr = 0 #resetting of the retraction length
+                    l_retr = 0 # resetting of the retraction length
                     
                 
                
             if(l_ex > k*retr_d):# checks if to many retractions in extrusion interval
-                if(n_retract > n_retract_max): #innitiate deletions of retractions
-                    n_remove = n_retract - n_retract_max #how many retractions need to be removed
+                if(n_retract > n_retract_max): # innitiate deletions of retractions
+                    n_remove = n_retract - n_retract_max # how many retractions need to be removed
                     compensation = 0
-                    #check if last value is negative
+                    # check if last value is negative
                     if(ex_p < 0):
                         for front in range(i+1,len(Ex_list)):
                             p = Ex_list[front]
@@ -334,7 +413,7 @@ if (run_mainloop):
                                 if(compensation >= retr_d):# full retraction in the end of list
                                     break #stops adding more to the list
                                     
-                    #check if the extrusion of the last elements is bigger/equal than retrction distance                
+                    # check if the extrusion of the last elements is bigger/equal than retrction distance                
                     if(ex_p >= 0):
                         compensation_back = 0
                         for back in range(i_1-1,0,-1):
@@ -356,21 +435,21 @@ if (run_mainloop):
                                         
                                         if(compensation >= retr_d):
                                             i = front 
-                                            break #stops adding more to the list
+                                            break # stops adding more to the list
                                             
-                            else: #positive value
+                            else: # positive value
                                 compensation_back += ex_p
-                                if(compensation_back >= retr_d): #do nothing, if negative value comes before it it will add more to the list
+                                if(compensation_back >= retr_d): # do nothing, if negative value comes before it it will add more to the list
                                     break
                             
                                
-                    ges_retr_remove += n_remove #counts all the deleted retractions
+                    ges_retr_remove += n_remove # counts all the deleted retractions
                     
-                    del_retr(i_0, i_1, n_remove) #run function which deletes retractions within the list
+                    del_retr(i_0, i_1, n_remove) # run function which deletes retractions within the list
                     
-                    n_corrections += 1 #this shows in the end how many corrections the program made
+                    n_corrections += 1 # this shows in the end how many corrections the program made
                     
-                    #reset all values
+                    # reset all values
                     n_retract = 0
                     
                     l_ex = 0
@@ -380,7 +459,7 @@ if (run_mainloop):
                     i_0 = i + 1
                     
                 else:    
-                    #reset all values
+                    # reset all values
                     n_retract = 0
                     
                     l_ex = 0
@@ -392,8 +471,8 @@ if (run_mainloop):
         
         
     except Exception as error:
-        #if a bug occures in the function it will tell you the error message at the end of the gcode
-        #and inside the terminal
+        # if a bug occures in the function it will tell you the error message at the end of the gcode
+        # and inside the terminal
         end_line = len(lines)-1
         
         error_message = ';' + str(error) + '\n'
@@ -404,7 +483,7 @@ if (run_mainloop):
         error_n += 1
             
      
-    #prevents the terminal from beeing closed and shows you that there has been an error        
+    # prevents the terminal from beeing closed and shows you that there has been an error        
     if(wait_for_error == True and error_n > 0):
         print(str(error_n) + 'Errors')
         print('successful corrections:' + str(n_corrections))
@@ -413,25 +492,37 @@ if (run_mainloop):
         
 
            
-if(debugging_run): #run different debugging tests
-    for l in range(0, len(lines)-1, 1): #get the list with extrusion
+if(debugging_run): # run different debugging tests
+    for l in range(0, len(lines)-1, 1): # get the list with extrusion
         find_E(l)
     
     if(debugging_remove_E):
-        for h in range(0,len(Ex_list)-1,1): #remove all E to see if it's working
+        for h in range(0,len(Ex_list)-1,1): # remove all E to see if it's working
             remove_E(Ex_list[h])
     
     
     if(debugging_del_retr):
         Test_del_retr = []
-        for dd in range(3800,4000,1): #test in interval to delete retractions
+        for dd in range(3800,4000,1): # test in interval to delete retractions
             Test_del_retr.append(Ex_list[dd])
         
         del_retr(Test_del_retr, 3)
 
+
+    
+            
+if(Output == True):
+    # saves a list as a file
+    with open(path_output, "w") as output:
+        for t in range(0,len(lines)):        
+            output.write("%s"  % lines[t])           
+    output.close()
+input_file.close()  
+
+
 end_time = time()
         
-#prints useful information in Terminal    
+# prints useful information in Terminal    
 if(control_stats  and run_mainloop):
     print('Script called: limit_retractions.py')
     print('Path to script: ', sys.argv[0], '\n')
@@ -446,17 +537,18 @@ if(control_stats  and run_mainloop):
     total_time = end_time - start_time
     print('Run time: ', total_time, '[s]', '\n')
     
-    
-    
-    
-if(Output == True):
-    #saves a list as a file
-    with open(path_output, "w") as output:
-        for t in range(0,len(lines)):        
-            output.write("%s"  % lines[t])           
-    output.close()
-input_file.close()  
+    print('Extrusionen',len(Ex_list))
 
+if(debugging_find_E):
+    # for debugging find_E function    
+    with open("C:/Users/bjans/Downloads/Ex_list.txt", "w") as Out_list:
+        for t in range(0,len(Ex_list)): 
+            gcode_line = Ex_list[t]
+            Out_list.write("%s"  % lines[gcode_line])
+    Out_list.close()
+
+    
+# closes the terminal window after you press enter
 if(pause_for_info and run_in_slicer and control_stats and run_mainloop):
     print('Press Enter to close')
     input()
