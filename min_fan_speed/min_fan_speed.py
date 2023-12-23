@@ -10,17 +10,18 @@ If the fan speed is set to 0 the program won't change that since it's intantuall
 I would recommend to test the program first to see that everything is working
 Use at your own risk!
 """
-#!/usr/bin/python
+#!/usr/bin/python3
 import re
 import sys
 from math import ceil
+
 
 run_in_slicer = True #run from slicer or from path
 use_percent = False
 #this setting speeds up the fan first and then sets the min fan speed
 #this is needed if the fan can run at the min speed, but doesn't start on it's own
 blib_function = True 
-wait_for_error = True #recomended to set to True otherwise you won't be notifyed if there was an error
+wait_for_error = True
 
 blib_speed = 100 #must be value between 0 and 255 fan speed which accelerates fan to get it started for lower fan speed
 
@@ -31,13 +32,15 @@ min_fan_speed = 41 #must be value between 0 and 255 but will be ignored if use_p
 
 if(use_percent == True):
     min_fan_speed = ceil(255*min_fan_percent/100) #rounded up value
-        
+
+
+prog_fan = re.compile('^M106 S')       
 #main function
 def change_fan_speed(i):
     line = lines[i]
     
-    if(re.search('^M106 S', line)): #search for the M106 command
-        line_start = line.find('S') + 1 #+1 one to exclude S itself
+    if(prog_fan.match(line)): #search for the M106 command
+        line_start = line.find('S') + 1 #+1 one to include S itself
         if(re.search(';', line)):
            line_end = line.find(';') #value is in between of S and ;
            comment = ' ' + line[line_end:len(line) - 1] #saves comment
@@ -77,11 +80,11 @@ if (run_in_slicer == True):
     
 else:#if not running in slicer
     #insert the path for the input and output file here
-    path_input = "C:/Users/bj/Downloads/funko_wall_mount_5h0m_0.20mm_215C_PLA_ENDER5PRO.gcode"
+    path_input = "C:/Users/bjans/Downloads/funko_wall_mount_5h0m_0.20mm_215C_PLA_ENDER5PRO.gcode"#"C:/Users/bjans\Downloads\CE5_02mm_2h08min_apollo-11-lem-moonwatch-display_seperate_parts.gcode"
     #you can name the output file however you want but don't forget to name it .gcode
     #if input and output path are the same the old file will be overwritten
-    path_output = "C:/Users/bj/Downloads/funko_wall_mount_5h0m_0.20mm_215C_PLA_ENDER5PRO_test.gcode"
-    
+    path_output = "C:/Users/bjans/Downloads/funko_wall_mount_5h0m_0.20mm_215C_PLA_ENDER5PRO_test.gcode"#"C:/Users/bjans\Downloads\CE5_02mm_2h08min_apollo-11-lem-moonwatch-display_seperate_parts_test.gcode"
+
 with open(path_input, "r") as input_file:
     lines = input_file.readlines() #saves the read gcode as an list
     
@@ -93,7 +96,7 @@ for l in range(0, len(lines)-1, 1):
         change_fan_speed(l)
         
     except Exception as error:
-        #if a bug occures in the function it will tell you the error message at the end of the gcode
+        #if an bug occures in the function it will tell you the error message at the end of the gcode
         #and inside the terminal
         end_line = len(lines)-1
         
@@ -104,14 +107,17 @@ for l in range(0, len(lines)-1, 1):
         print('Error message:' + str(error_message))
         error_n += 1
         
- 
+
 #prevents the terminal from beeing closed and shows you that there has been an error        
 if(wait_for_error == True and error_n > 0):
+    print('Script called: min_fan_speed.py')
+    print('Path to script: ', sys.argv[0], '\n')
+    
     print('Press Enter to close')
     input()
 
 
-#writes the file
+#saves a list as a file
 with open(path_output, "w") as output_file:
     for t in range(0,len(lines)):        
         output_file.write("%s"  % lines[t])           
