@@ -1,4 +1,4 @@
-Example of how the script limit_retractions.py manipulates the retractions of the gcode file
+## Example of how the script limit_retractions.py manipulates the retractions of the gcode file
 
 ![Collage_before_after](https://github.com/WatchingWatches/Post_processing_gcode/assets/106354710/bc6427a8-e1f5-40dd-9481-be738bed33a3)
 
@@ -47,13 +47,6 @@ The script is intended to limit the number of retractions in a 3D printing G-cod
 11. **Final Information Display:**
     - The script displays information about the run, including the script name, path, number of corrections, deleted retractions, retraction distance used, and runtime.
 
-### Notes:
-- The script uses comments extensively to provide information and instructions.
-- It includes error handling and displays error messages if an exception occurs.
-
 ### Recommendations:
 - Before using this script, users should carefully review the provided comments and instructions.
-- The script is designed to be called within PrusaSlicer, and it might not display modifications in the PrusaSlicer preview due to the timing of script execution.
-
-This is a high-level overview, and if you have specific questions about certain parts of the script or its functionality, feel free to ask!
-
+- The script is designed to be called within PrusaSlicer, and it does not display modifications in the PrusaSlicer preview due to the timing of script execution.
