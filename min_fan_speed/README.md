@@ -5,3 +5,5 @@ Often fans can spin at a low setting, but can't start at this setting. Therefore
 
 I would recommend to test the program first to see that everything is working.
 Use at your own risk!
+
+If you are using Klipper firmware you don't have to use this script since there is a build in function. Read more here: https://www.klipper3d.org/Config_Reference.html#fan
