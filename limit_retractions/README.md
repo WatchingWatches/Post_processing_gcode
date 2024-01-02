@@ -2,6 +2,7 @@
 
 ![Collage_before_after](https://github.com/WatchingWatches/Post_processing_gcode/assets/106354710/bc6427a8-e1f5-40dd-9481-be738bed33a3)
 
+### Find parameter:
 To find the right parameter for n_retr_max i have created a python script: 'test_max_reatractions.py'. This script generates a test gcode to print.
 
 Chat gpt summorized the function of my program "limit_retractions.py" like this:
