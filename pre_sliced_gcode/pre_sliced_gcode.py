@@ -12,36 +12,60 @@ Created on Mon Nov 13 11:48:13 2023
 Features:
     + manually change position by applaying offset
     + change retraction
+    + change start procede (custom purgeline...)
+        + change temperature
     - centers the model
-    - change temperature
     - change speed settings
     - apply offset
-    - change start procede (purgeline etc.) #text datei einfügen
-
+    
+Please also read the README.md file
 """
 import re
 import time
 
 # Setup enable functions
-center = True
-change_temp = True
-change_retr = True
-
+#center = True
+#change_temp = True
 
 # User Input
-retr_d_1 = 4.5 # your retraction distance in mm
-# only square build plates
-build_plate = 220 # saves build plate size in mm
-"""
-NOT USED CURRENTLY
+# acessing file:
+path_input = r"C:\Users\bjans\Downloads\Shape-Cylinder_35m_0.20mm_210C_PLA_ENDER5PRO.gcode" # path to file you want to edit
+# you can name the output file however you want but don't forget to name it .gcode
+# if input and output path are the same the old file will be overwritten
+file_name = 'test_presliced_script'
+folder_output = r"C:\Users\bjans\Downloads" # folder to write the new file to
+
+own_start_gcode = True # either True or False (option not used)
+# line in which the old start gcode ends (remember that in programming we start counting from 0)
+old_start_gcode = 52
 temp_end = 200 # nozzle temperature in C
 temp_bed = 60 # bed temperature in C
+# path to the file with start gcode look at the example file and edit you start gcode 
+path_start_gcode = r"C:\Users\bjans\OneDrive\Dokumente\CAD\Software\post_processing_gcode\pre_sliced_gcode\start_gcode.gcode"
+
+change_retr = True
+retr_d_1 = 4.5 # your retraction distance in mm
+
+
+# only square build plates
+build_plate = 220 # saves build plate size in mm
+
+
+# manually move object by adding this value to every coordinate
+manual_offset = True
+X_offset = 10
+Y_offset = 10
+"""
+NOT USED CURRENTLY
+
 z_offset = 0 
 max_speed = 80 # maximum speed in mm/s
+# convert to feedrate
+max_Feedr = max_speed / 60
 """
 
 # compile serch key words
-prog_move = re.compile('[X|Y]') #r'^G[1-3].*[X|Y]'
+prog_move = re.compile(r'X.*Y') #'[X|Y]') #r'^G[1-3].*[X|Y]'
 prog_comment = re.compile('[;]')
 prog_digit = re.compile(r'[0-9\-.]+')
 prog_F = re.compile('[F]') 
@@ -50,17 +74,11 @@ prog_comment = re.compile('[;]')
 prog_E = re.compile('[E]')
 
 
-#middle_X_Y = (build_plate[0]/2,build_plate[1]/2) # calculate the middle of the buildplate
 middle_buildplate = build_plate/2
     
-    
-""" calculate offset from distance of points to middle
-Method will run into problems since there are different amount of ponits for specific shape 
-(round more than straight!)
-"""
 
 # passed tests                
-def read_position(direction, i):
+def read_position(direction: str, i: int)-> list:
     """
     Args: 
         direction (str): find value after key word
@@ -72,8 +90,11 @@ def read_position(direction, i):
     """   
     line = lines[i]
     
+    
     line_start = line.find(direction) + 1
     
+    # using or is slow!
+    # instead use re.search?!
     for k in range(line_start, len(line)):
         if(line[k].isdigit() or line[k] == '.' or line[k] == '-'): # if it's a number
         # if(prog_digit.search(line[k]))
@@ -89,7 +110,7 @@ def read_position(direction, i):
     return info
     
                 
-def offset(direction, offset, i): # apply offset to coordinate
+def offset(direction: str, offset: float, i: int)-> None: # apply offset to coordinate
     """
     Args: 
         direction (str): which value to change
@@ -124,7 +145,7 @@ def offset(direction, offset, i): # apply offset to coordinate
     lines[i] = line
     
     
-def change_retr_d(factor, i):
+def change_retr_d(factor: float, i: int)-> None:
         """
         Args: 
             factor (float): factor to multiply with
@@ -152,14 +173,20 @@ def change_retr_d(factor, i):
         
         # writing to gcode list
         lines[i] = line + '\n'
-    
+
+
+""" calculate offset from distance of points to middle
+Method will run into problems since there are different amount of ponits for specific shape 
+(round more than straight!)
+"""    
 def calculate_offset(i):
     #TODO
     # calculate the X and Y positional offsets
+    # first find first layer
     pass
 
 
-def extrusion(i): #reads E value
+def extrusion(i: int) -> float: #reads E value
     """
     Args:
         line of gcode with extrusion (int)
@@ -191,7 +218,7 @@ def extrusion(i): #reads E value
 
                 
 # passed test performance seems good            
-def get_retr_d(Ex_list):
+def get_retr_d(Ex_list: list)-> float:
     """
     args:
         Ex_list (list): list with lines with extrusion
@@ -239,10 +266,11 @@ move_list = []
 Ex_list = []
  
 # seems to work now
-def sort_gcode(gcode_list)-> None:
+def sort_gcode(gcode_list: list, offset: int = 0)-> None:
     """
     Args:
         gcode_list (list :str)
+        offset (int): start of searching gcode default is 0
 
     Returns:
         None
@@ -251,28 +279,18 @@ def sort_gcode(gcode_list)-> None:
 
     """
     global retr_d_0
-    i = 0 
+    i = 0 + offset # not changing start gcode
     l_comp = 0
     comp_flag = False
     
-    for line in gcode_list:
+    for line in gcode_list[offset:]:
         # check for G 1-3
         if(prog_G.match(line)):
             match_comment = prog_comment.search(line)
-            # check for move
+            # check for move (must incude X and Y)
             if(prog_move.search(line)):
-                if(match_comment):
-                    #in case line has a comment
-                    X = line.find('X') #finds the first X in line 
-                    comment = match_comment.start() # test if this works and is faster
-                    # this should be faster since we dond't need to search again
-                    
-                    #when the E is in front of the ; it's an extrusion
-                    if(X < comment):
-                        move_list.append(i)
-                else:
-                    move_list.append(i)
-                
+                move_list.append(i)
+               
             # check for extrusion to write retracton list
             if(prog_E.search(line)):
                 if not(match_comment): #prevents finding the E in the comments like ;WIPE
@@ -298,33 +316,65 @@ def sort_gcode(gcode_list)-> None:
             retr_list.append(i)
             # check for compensation of retraction
             comp_flag = True
-        else:
-            if comp_flag:
-                l_comp += ex
-                retr_list.append(i)
-                # compensation complete
-                if(l_comp >= retr_d_0):
-                    comp_flag = False
-                    l_comp = 0
+        elif comp_flag:
+            l_comp += ex
+            retr_list.append(i)
+            # compensation complete
+            if(l_comp >= retr_d_0):
+                comp_flag = False
+                l_comp = 0
     
     
 
 start_1 = time.time()  
+
 # MAIN
-path_input = r"C:\Users\bjans\Downloads\Shape-Cylinder_35m_0.20mm_210C_PLA_ENDER5PRO.gcode"
-# you can name the output file however you want but don't forget to name it .gcode
-# if input and output path are the same the old file will be overwritten
-file_name = 'test_presliced_script'
-folder_output = r"C:\Users\bjans\Downloads"
-
-#path_output = r"C:\Users\bjans\Downloads\test_presliced script.gcode"
-
-
 with open(path_input, "r") as input_file:
     lines = input_file.readlines() # saves the gcode as an list
 
-# sort gcode
-sort_gcode(lines)  
+#TODO untested
+if own_start_gcode:
+    
+    with open(path_start_gcode, 'r') as f_start:
+        # saves start gcode to list
+        start_lines = f_start.readlines()
+    
+    # change temp in start file
+    prog_bed_temp = re.compile(r'\{bed_temp\}')
+    prog_end_temp = re.compile(r'\{end_temp\}')
+    
+    l = 0
+    for k in start_lines:
+        bed = prog_bed_temp.search(k)
+        hotend = prog_end_temp.search(k)
+        
+        if bed:
+            start = bed.start()
+            end = bed.end()
+            
+            start_lines[l] = k[:start]+ str(temp_bed) + k[end:]
+        
+        elif hotend:
+            start = hotend.start()
+            end = hotend.end()
+            
+            start_lines[l] = k[:start]+ str(temp_end) + k[end:]
+            
+        l +=1
+    
+    # delete old start gcode
+    del lines[:old_start_gcode]
+    
+    # write own start gcode to gcode list    
+    lines[:0] = start_lines
+    
+    # sort gcode withot changing the start gcode
+    sort_gcode(lines, len(start_lines))
+    
+else:
+    # sort gcode
+    sort_gcode(lines)
+    
 
 # calculate retr factor  
 retr_factor =  retr_d_1 / retr_d_0
@@ -333,16 +383,13 @@ retr_factor =  retr_d_1 / retr_d_0
 if(change_retr and retr_factor != 1):
     for retr in retr_list: 
         change_retr_d(retr_factor, retr)
-    
-
-# manually move object
-X_offset = 10
-Y_offset = 10
-
-for line in move_list:
-    offset('X', X_offset, line)
-    offset('Y', Y_offset, line)
-    
+   
+# applying manual offset    
+if manual_offset:
+    for line in move_list:
+        offset('X', X_offset, line)
+        offset('Y', Y_offset, line)
+        
 
 path_output = folder_output + '/' + file_name + '.gcode'   
 
