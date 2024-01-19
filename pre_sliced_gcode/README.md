@@ -16,7 +16,8 @@ The program doesn't automatically know where the start gcode of the given file e
 ## Limitations:
 - When changing the position of the object the purge line will be moved too which might lead to a problem (when this happens the program warns you). If you use your own start gcode the offset won't affect your purgeline.
 - Absolute coordinates must be used (X,Y)
-- Relative Extrusion must be used (check if the E values get added up, this would mean it's absolute extrusion) 
+- Relative Extrusion must be used (check if the E values get added up, this would mean it's absolute extrusion)
+- If Z-Hop is used the automatic center feature won't work properly
 - You must have the same nozzle size, which the gcode uses
 
 ## Goals for the future:
