@@ -358,7 +358,7 @@ if(serach_for_retr_d):
                 print('Enter retraction distance manually and press enter use "." as decimal point', '\n')
                 print('check your output options in the slicer settings')
                 
-                retr_d = input()
+                retr_d = float(input())
             break # stop searching the gcode
 
 """How the main loop works:
