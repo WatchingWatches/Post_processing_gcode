@@ -2,6 +2,25 @@
 
 ![Collage_before_after](https://github.com/WatchingWatches/Post_processing_gcode/assets/106354710/bc6427a8-e1f5-40dd-9481-be738bed33a3)
 
+## How to set up in slicer (Prusa/Orca):
+In the printer setting under custom gcode/machine-gcode insert the following in End-Gcode:
+
+Prusa slicer:
+
+{if filament_retract_length[0] == retract_length[0]}; override_retract_length = {filament_retract_length[0]} {endif}
+
+Orca slicer:
+
+{if retraction_length[0] == filament_retraction_length[0]}; override_retract_length = {filament_retraction_length[0]} {endif}
+
+When you want to use override the n_retract_max add this in filament settings in custom end gcode:
+
+; stop searching
+; n_retract_max_override = 12
+
+You can adjust the number to the setting you want. If you want to use the default just don't insert the last line.
+You will need to insert "; stop searching" to every filament (it would still run, but a bit slower). If you don't want to use the override option insert "; stop searching" <ins>above</ins> the other line inserted in printer settings.
+
 ### Find parameter:
 To find the right parameter for n_retr_max i have created a python script: 'test_max_reatractions.py'. This script generates a test gcode to print.
 
