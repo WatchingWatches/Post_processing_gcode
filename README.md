@@ -1,5 +1,5 @@
 # Post_processing_gcode_Prusa_slicer
-## How to run script from Slic3r/Prusaslicer:
+## How to run script from Slic3r/Prusaslicer/Orcaslicer:
 go to print settings => output options => post processing scripts then enter your path to the python.exe and the python script like this: "C:\Users\bj\anaconda3\python.exe" "C:\Users\bj\OneDrive\Dokumente\CAD\Software\post_processing_gcode\min_fan_speed.py";
 If you want to run the script from the slicer set "run_in_slicer = True" inside of the script.
 If the slicer can't execute python you'll get the error: Win32 error 193
