@@ -5,6 +5,10 @@ The purpose is to take timelapse with the print head at the best possible positi
 The script also lets you pick a minimum amount of layers at which the timelapse should be activated.
 If the layer number is below it won't insert the "TIMELAPSE_TAKE_FRAME" command.
 
+## Example Video with right back corner coordinates:
+
+[example video](https://github.com/WatchingWatches/Post_processing_gcode/assets/106354710/d64de6ae-fa5a-4334-8307-cd93ea79722f)
+
 ## How to set up:
 If you have already inserted the "TIMELAPSE_TAKE_FRAME" command inside of your gcode delete it. Otherwise there will be two pictures every layer.
 If you want to run the script every time after you save the gcode set "run_in_slicer = True".
