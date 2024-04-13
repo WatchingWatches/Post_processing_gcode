@@ -8,9 +8,10 @@ Often times these scripts are universally working or can be easily adapted to wo
 -  min_fan_speed: set a minimum fan speed setting
 -  optimised_timelapse: perfecting the timelapse, by taking the picture at the same location every layer
 -  pre_sliced_gcode: modify gcode to suit your printer
+-  anti_elephantfoot: reduce elephant foot and increasing dimensional accuracy
 ## How to run script from Slic3r/Prusaslicer/Orcaslicer:
 go to print settings => output options => post processing scripts then enter your path to the python.exe and the python script like this: "C:\Users\bj\anaconda3\python.exe" "C:\Users\bj\OneDrive\Dokumente\CAD\Software\post_processing_gcode\min_fan_speed.py";
-If you want to run the script from the slicer set "run_in_slicer = True" inside of the script.
+If you want to run the script from the slicer set ``run_in_slicer = True`` inside of the script.
 If the slicer can't execute python you'll get the error: Win32 error 193
 For debugging run the script in an IDE with a presliced gcode.
 Use on your own risk!
