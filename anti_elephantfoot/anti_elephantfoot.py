@@ -2,7 +2,7 @@
 """
 Created on Thu Apr 11 21:19:24 2024
 
-@author: Benedikt Jansson
+@author: bjans
 
 Prevent elephant foot by reducing flow by a given factor at the outer perimeter at the first layer.
 This only works with relative extrusion.
@@ -14,8 +14,9 @@ import sys
 # user variables
 # the comments work within prusa slicer
 # you probably need to adapt them to other slicers
-flow_factor = 0.9 # factor which gets multiplyed with outer perimiter
-run_in_slicer = True
+# you can define a factor for each layer just add as many as you want (one minimum)
+flow_factor_list = [0.9, 0.95] # factors which gets multiplyed with outer perimiter
+run_in_slicer = False
 outer_perimiter_comment = ";TYPE:External perimeter" # comment which indicates the outer perimiter
 type_comment = ";TYPE:" #comment which indicates a certain feature type (followed by the actual type)
 layerchange_comment = ";LAYER_CHANGE" # comment which indicates a layerchange (in prusa slicer is a layer change before the start of the first layer)
@@ -137,7 +138,9 @@ retr_d = 0
 comp = 0
 search_retr_d = True
 previous_neg_number = False
+flow_factor = flow_factor_list[0]
 
+# main loop
 for line in lines:
     # if outer perimiter found
     if re.match(prog_outer_perimiter, line):
@@ -156,9 +159,13 @@ for line in lines:
     if re.match(prog_layerchange, line):
         # there is one layer change at the bigginning of the first layer
         layer += 1
-        if layer == 2:
-            # found end of first layer program finished
+        
+        if layer == len(flow_factor_list) + 1:
+            # found end of first (couple of) layers program finished
             break
+        
+        flow_factor = flow_factor_list[layer-1] # -1 because layer starts at 1 and list at 0
+        
     # iterator of loop (count line in lines)        
     i += 1
     
