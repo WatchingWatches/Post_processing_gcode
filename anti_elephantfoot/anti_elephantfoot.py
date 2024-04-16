@@ -16,7 +16,7 @@ import sys
 # you probably need to adapt them to other slicers
 # you can define a factor for each layer just add as many as you want (one minimum)
 flow_factor_list = [0.9, 0.95] # factors which gets multiplyed with outer perimiter
-run_in_slicer = False
+run_in_slicer = True
 outer_perimiter_comment = ";TYPE:External perimeter" # comment which indicates the outer perimiter
 type_comment = ";TYPE:" #comment which indicates a certain feature type (followed by the actual type)
 layerchange_comment = ";LAYER_CHANGE" # comment which indicates a layerchange (in prusa slicer is a layer change before the start of the first layer)
